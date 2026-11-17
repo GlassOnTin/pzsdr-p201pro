@@ -94,9 +94,12 @@ See `docs/ps7-init-format.md`.
 
 - The ethernet root cause and fix are verified (FSBL bisection plus direct
   register writes). See the regression doc for what was ruled out.
-- The newer Linux 5.15 vendor firmware has a separate, unresolved MDIO fault
-  (no PHY responds at any address); its devicetree assumes a different ethernet
-  topology. Not fixed here.
+- The newer Linux 5.15 vendor firmware has a separate MDIO fault (no PHY at any
+  address), characterized as a PL-design/bitstream-level issue in its
+  direct-RGMII topology. The GPIO clock fix, MIO re-routing, and a full MDIO
+  scan do not resolve it; it needs the vendor's design source. Use the stock
+  firmware with the GPIO clock fix. See `docs/ethernet-regression.md` and issue
+  #1.
 - The QSPI U-Boot environment on the tested board was incomplete (`read_sf`
   undefined), so QSPI autoboot fell into DFU. Repaired and verified; see
   `fix/qspi-env.md`.

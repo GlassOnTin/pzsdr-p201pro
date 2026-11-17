@@ -104,11 +104,17 @@ persists and why direct writes to it take effect.
   bootm 0x2080000#config@0
   ```
 
-- The new Linux 5.15 firmware (also 2026-11-16) has a separate, unresolved
-  fault: no PHY responds on MDIO at any of the 32 addresses. Its devicetree
-  assumes a direct-RGMII topology (PHY at address 0, no converter) that does not
-  match the stock converter bitstream. The GPIO_CLK fix is necessary but not
-  sufficient for that firmware.
+- The new Linux 5.15 firmware (also 2026-11-16) has a separate fault: no PHY
+  responds on MDIO at any of the 32 addresses. Its devicetree assumes a
+  direct-RGMII topology (PHY at address 0, no converter) and its FSBL MIO init
+  matches that design (MIO24-27 `L0_SEL=1`, MIO52/53 as GPIO with pullup).
+  Verified on hardware: the GPIO_CLK fix does not restore MDIO; routing GEM0
+  MDIO back to MIO52/53 does not restore it; a full 32-address scan with the
+  GPIO fix finds no PHY. So the new direct-RGMII bitstream's MDIO path does not
+  reach the PHY (or the new PL logic holds it in reset). This is a
+  PL-design/bitstream-level fault, not fixable via GPIO clock, MIO pinmux, or DT
+  PHY address. It needs the vendor's Vivado design source or schematic. The
+  stock converter firmware with the GPIO clock fix is the working path.
 
 ## Limitations
 
