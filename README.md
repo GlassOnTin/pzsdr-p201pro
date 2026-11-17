@@ -66,6 +66,8 @@ devmem 0xF8000138 32 0x11       # GPIO_CLK_CTRL: set CLKACT0 (bit 4)
 - `docs/ethernet-regression.md` — the ethernet failure: diagnosis and root cause.
 - `docs/ps7-init-format.md` — the vendor FSBL init-data format, decoded.
 - `fix/ethernet-gpio-clk.md` — the one-bit ethernet fix, three ways to apply it.
+- `fix/qspi-env.md` — repair the incomplete QSPI U-Boot environment so QSPI
+  autoboots.
 - `ps7_init/ps7_init.tcl` — board-exact Zynq PS7 init recovered from the FSBL,
   validated over JTAG (DDR bring-up). Usable with `xsdb` for JTAG boot.
 - `tools/` — extraction and analysis tools (see `tools/README.md`):
@@ -96,8 +98,8 @@ See `docs/ps7-init-format.md`.
   (no PHY responds at any address); its devicetree assumes a different ethernet
   topology. Not fixed here.
 - The QSPI U-Boot environment on the tested board was incomplete (`read_sf`
-  undefined), so QSPI autoboot falls into DFU. Manual boot works; see the
-  regression doc.
+  undefined), so QSPI autoboot fell into DFU. Repaired and verified; see
+  `fix/qspi-env.md`.
 - The recovered `ps7_init.tcl` was validated for DDR bring-up over JTAG. A full
   JTAG Linux boot reached the kernel but hung before USB gadget init; that hang
   is separate from the ethernet issue and is not resolved here.

@@ -117,4 +117,5 @@ persists and why direct writes to it take effect.
   not available to confirm the net. The register-level cause and fix are
   verified by bisection and direct write.
 - The 5.15 firmware MDIO failure is characterized, not fixed.
-- The QSPI environment corruption is noted, not repaired.
+- The QSPI environment corruption is repaired and verified (see
+  `../fix/qspi-env.md`); QSPI now autoboots cleanly.
