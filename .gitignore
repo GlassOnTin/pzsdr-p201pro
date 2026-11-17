@@ -1,0 +1,18 @@
+# Do not commit vendor firmware binaries or dumps (copyright).
+# Extract these from your own board; see README.md.
+*.bin
+*.BIN
+*.ub
+*.elf
+*.bit
+*.dtb
+*.gz
+mtd*
+BOOT*
+image.ub
+uImage
+uramdisk*
+# build artifacts
+mdiotool
+*.o
+__pycache__/
