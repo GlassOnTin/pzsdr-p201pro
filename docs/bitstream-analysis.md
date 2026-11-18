@@ -73,6 +73,39 @@ MDIO is not connected to the PHY's MDIO pin (the stock converter forwarded MDIO;
 the direct design must route it explicitly, and does not, or routes it to MIO
 pins that the PCB does not wire to the PHY).
 
+## EMIO tracing investigation (toward closing #1/#3 from the bitstream)
+
+The active-routing tracer (`tools/route_trace.py`, upstreamed as
+[f4pga/prjxray#2579](https://github.com/f4pga/prjxray/pull/2579)) reconstructs
+the configured routing graph from FASM PIPs + `tileconn`. On the stock bitstream
+it captures ~173k active PIP edges including the interconnect backbone and the
+PS-boundary (`PSS0`–`PSS4`) tiles. Two gaps remain for an end-to-end
+GEM0-MDIO-to-PHY trace:
+
+1. **EMIO-signal -> PSS-wire mapping is undocumented in the zynq7 db.**
+   - `ps7_ports.json` and `site_type_PS7.json` name the EMIO signals
+     (`EMIOENET0MDIOMDC/O/TN/I`, `EMIOENET0GMIIRXD[0:7]`, etc.) and their
+     direction, but `site_pips` is empty and the PSS tiles' `pin_functions`
+     only cover the DDR IOPADs, not EMIO.
+   - The PSS wires are generic (`PSS1_LOGIC_OUTS<group>_<bit>`, groups 0-23);
+     nothing maps them to EMIO signal names.
+   - UG585 Table 16-13 gives MIO pins (MDIO = MIO52 MDC / MIO53 data) and EMIO
+     signal *names*, but not the PSS-wire index. The Vivado PS7 IP RTL
+     (`processing_system7.ttcl`) maps EMIO ports to PS7 internal port names
+     (`ENET0_MDIO_MDC`), not PSS wires — the EMIO->PSS relation is the silicon
+     PS-PL interface.
+   - Filling this needs prjxray-style fuzzing of the PS-PL interface (drive known
+     EMIO signals, diff bitstreams) to document the PSS-wire <-> EMIO-signal map.
+     That is a reusable zynq7 db contribution.
+
+2. **IO-interconnect mux mapping.** IOB outputs reach the fabric via
+   `OLOGIC.OMUX` / `ILOGIC.IMUX` selections; the mux-input -> IOI-wire relation
+   needs the db site-pin mapping. `route_trace.py --iomux` is a first attempt.
+
+With those two mappings, the tracer can walk GEM0's EMIO MDIO port through the
+active PIPs to the bank-35 PHY IOB and compare stock vs new — a bitstream-only
+diagnosis of #1, and the reset-GPIO net for #3.
+
 ## Limitations
 
 - prjxray recovers IOB pin usage/IOSTANDARD/pull/drive, **not** the internal
