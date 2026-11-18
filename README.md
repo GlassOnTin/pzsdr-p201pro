@@ -73,6 +73,8 @@ devmem 0xF8000138 32 0x11       # GPIO_CLK_CTRL: set CLKACT0 (bit 4)
 - `tools/` — extraction and analysis tools (see `tools/README.md`):
   FIT/uImage parsing, FSBL init-data extraction, `ps7_init.tcl` generation,
   register-init diffing, FSBL patching, and a small MDIO ioctl tool.
+- `docs/bitstream-analysis.md` + `bitstream-analysis/` — prjxray IOB pin-usage
+  diff of the stock vs new bitstream (characterizes the 5.15 MDIO fault, #1).
 
 ## Extracting firmware from your own board
 
