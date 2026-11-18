@@ -49,3 +49,24 @@ See `../docs/ps7-init-format.md` for the data format.
 The `xsdb` scripts used during the investigation (ps7_init test, JTAG boot,
 register probes) are described in `../docs/ps7-init-format.md` and
 `../docs/hardware.md`. They are short enough to recreate from those docs.
+
+## Bitstream routing trace
+
+- `route_trace.py` — active-configuration routing tracer. Builds the wire-node
+  graph from a prjxray db (`tilegrid` + `tileconn`), adds the PIPs actually set
+  in a FASM file, and reports connected components / BFS traces between wires.
+  Unlike prjxray `simpleroute` (possible routes from the full PIP db), this uses
+  only the active PIPs, so it reflects the configured design.
+
+  ```
+  route_trace.py --db-root <prjxray-db>/zynq7 --part xc7z020 \
+      --fasm design.fasm --components
+  route_trace.py ... --trace INT_L_X0Y16/SW2END1 INT_L_X0Y16/NL1BEG1
+  route_trace.py ... --site RIOI3_X73Y103/IOI_OCLKM_1
+  ```
+
+  Upstreamed as [f4pga/prjxray#2579](https://github.com/f4pga/prjxray/pull/2579).
+  Known gaps (toward full GEM0-MDIO-to-PHY tracing, issues #1/#3): IOI
+  OLOGIC/ILOGIC mux wire-name mapping (`--iomux` is experimental), and functional
+  EMIO naming in the zynq7 db (PSS wires are generic `PSS1_LOGIC_OUTS#_#`, so a
+  Zynq TRM EMIO-index cross-reference is needed to locate GEM0 MDIO).
