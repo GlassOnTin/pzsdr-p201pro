@@ -149,6 +149,44 @@ no PHY on MDIO. Diagnosed purely from the two bitstreams + prjxray db, no vendor
 schematic required. The fix is to restore the MDIO routing + IOB in the new
 PL design (or use the stock converter bitstream).
 
+## Definitive result for #3 (PHY reset GPIO net)
+
+The same tracer resolves the PHY reset/control GPIO. The kernel labels it
+"reset" (`gpio-973`, EMIO13). Its PS7 output wire is `PS7_EMIOGPIOO13`, linked to
+the fabric by the fixed PIP `PSS2.PSS2_LOGIC_OUTS1_76.PS7_EMIOGPIOO13 always`
+(`ppips_pss2.db`). Tracing that wire through the active routing graph:
+
+| bitstream | EMIO13 output reaches | package pin | bank 34 function |
+|---|---|---|---|
+| stock | `RIOI3_X73Y55` (OLOGIC1) -> `RIOB33_X73Y55` | **W18/W19** | `IO_L22P/N_T3_34` |
+| new (2026-11-16) | `RIOI3_SING_X73Y99` (OLOGIC0) -> `RIOB33_SING_X73Y99` | **R19** | `IO_0_34` |
+
+Stock path (29 hops, abbreviated):
+
+```
+PSS2_X32Y105/PS7_EMIOGPIOO13 -> PSS3_LOGIC_OUTS1_16 -> INT_L/INT_R fabric
+  -> INT_R_X73Y55/SE2END1 -> R_TERM_INT_X184Y58/TERM_INT_IMUX34
+  -> RIOI3_X73Y55/IOI_OLOGIC1_D1 -> RIOI_OLOGIC1_OQ  (-> W18/W19)
+```
+
+New path (23 hops) ends at `RIOI3_SING_X73Y99/IOI_OLOGIC0_D1 -> RIOI_OLOGIC0_OQ`
+(-> R19). In the new bitstream the W18/W19 output logic (`RIOI3_X73Y55`
+OLOGIC1) is a 4-node component with **no PS7 EMIO driver** — the reset GPIO no
+longer reaches W18/W19.
+
+**Conclusion:** the stock design drives the PHY reset net from EMIO13 on
+W18/W19; the new direct-RGMII design routes EMIO13 to R19 instead. The IOB site
+`RIOB33_X73Y55` is still *configured* in the new bitstream (`in_new=1` in the
+pinmap), but configuring the site is not the same as routing the reset signal to
+it — an earlier reading of the pinmap alone missed this. So the new PL design
+changes the reset GPIO pin as well as stranding MDIO (#1). Both are consistent
+with the new bitstream targeting a different board revision/pinout.
+
+Caveat: which RTL8211F pin W18/W19 (or R19) physically drives is inferred from
+the kernel "reset" label and the stock routing; confirming the PCB net (RESETB)
+needs the schematic. The bitstream routing difference itself is verified by BFS
+on both decoded bitstreams.
+
 ## Limitations
 
 - With the `ppips_*.db` "always" PIPs loaded, `route_trace.py` traces internal

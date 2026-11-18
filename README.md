@@ -50,14 +50,15 @@ be installed; `djtgcfg enum` should list "Digilent JTAG-SMT1".
 
 A 2026-11-16 vendor firmware update breaks ethernet receive: link comes up at
 1 Gbps and transmit works, but the board receives nothing. The cause is one bit
-in the FSBL that gates the GPIO clock. See `fix/ethernet-gpio-clk.md` for the
-one-line fix and `docs/ethernet-regression.md` for the full diagnosis.
+in the FSBL that selects the wrong source for GEM0's RX signals (MIO instead of
+EMIO). See `fix/ethernet-gem0-rclk.md` for the one-line fix and
+`docs/ethernet-regression.md` for the full diagnosis.
 
 Quick runtime fix (until you reflash):
 
 ```
 devmem 0xF8000008 32 0xDF0D     # unlock SLCR
-devmem 0xF8000138 32 0x11       # GPIO_CLK_CTRL: set CLKACT0 (bit 4)
+devmem 0xF8000138 32 0x11       # GEM0_RCLK_CTRL: SRCSEL=EMIO (bit 4), CLKACT=1
 ```
 
 ## Repo layout
@@ -65,7 +66,7 @@ devmem 0xF8000138 32 0x11       # GPIO_CLK_CTRL: set CLKACT0 (bit 4)
 - `docs/hardware.md` — board interfaces, console/JTAG, boot, UART pins.
 - `docs/ethernet-regression.md` — the ethernet failure: diagnosis and root cause.
 - `docs/ps7-init-format.md` — the vendor FSBL init-data format, decoded.
-- `fix/ethernet-gpio-clk.md` — the one-bit ethernet fix, three ways to apply it.
+- `fix/ethernet-gem0-rclk.md` — the one-bit ethernet fix, three ways to apply it.
 - `fix/qspi-env.md` — repair the incomplete QSPI U-Boot environment so QSPI
   autoboots.
 - `ps7_init/ps7_init.tcl` — board-exact Zynq PS7 init recovered from the FSBL,
@@ -97,11 +98,11 @@ See `docs/ps7-init-format.md`.
 - The ethernet root cause and fix are verified (FSBL bisection plus direct
   register writes). See the regression doc for what was ruled out.
 - The newer Linux 5.15 vendor firmware has a separate MDIO fault (no PHY at any
-  address), characterized as a PL-design/bitstream-level issue in its
-  direct-RGMII topology. The GPIO clock fix, MIO re-routing, and a full MDIO
-  scan do not resolve it; it needs the vendor's design source. Use the stock
-  firmware with the GPIO clock fix. See `docs/ethernet-regression.md` and issue
-  #1.
+  address), traced to the new direct-RGMII bitstream stranding GEM0 MDIO (no
+  path to any IOB) and dropping the MDIO IOB pin. The `SRCSEL` fix, MIO
+  re-routing, and a full MDIO scan do not resolve it. Use the stock firmware
+  with the `SRCSEL` fix. See `docs/ethernet-regression.md`,
+  `docs/bitstream-analysis.md`, and issue #1.
 - The QSPI U-Boot environment on the tested board was incomplete (`read_sf`
   undefined), so QSPI autoboot fell into DFU. Repaired and verified; see
   `fix/qspi-env.md`.
@@ -120,4 +121,4 @@ GPIO net.
 - prjxray build fixes (GCC 15 / CMake 4): [f4pga/prjxray#2578](https://github.com/f4pga/prjxray/pull/2578).
 - prjxray active-configuration routing tracer: [f4pga/prjxray#2579](https://github.com/f4pga/prjxray/pull/2579).
 - P201Pro ethernet diagnosis + fix: [plutoplus/plutoplus#70](https://github.com/plutoplus/plutoplus/issues/70).
-- FSBL GPIO_CLK_CTRL note for derivatives: [analogdevicesinc/plutosdr-fw#114](https://github.com/analogdevicesinc/plutosdr-fw/issues/114).
+- FSBL GEM0_RCLK_CTRL note for derivatives: [analogdevicesinc/plutosdr-fw#114](https://github.com/analogdevicesinc/plutosdr-fw/issues/114).

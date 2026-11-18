@@ -60,10 +60,11 @@ cycle. The board should boot QSPI straight to Linux (login prompt), not stop at
 ...` (added by `qspiboot`).
 
 Verified on the tested board: QSPI autoboots to kernel 5.10, ethernet RX works
-(`eth0 rx_packets` increments), `GPIO_CLK_CTRL = 0x11`.
+(`eth0 rx_packets` increments), `GEM0_RCLK_CTRL = 0x11`.
 
 ## Note
 
-This restores the boot environment only. The ethernet GPIO-clock bug is in the
-FSBL, not the environment; see `ethernet-gpio-clk.md`. The original QSPI FSBL
-already has the GPIO clock enabled, so QSPI boot does not need that fix.
+This restores the boot environment only. The ethernet RX bug is in the FSBL
+(`GEM0_RCLK_CTRL.SRCSEL`), not the environment; see `ethernet-gem0-rclk.md`. The
+original QSPI FSBL already writes `SRCSEL=EMIO` (`0x11`), so QSPI boot does not
+need that fix.

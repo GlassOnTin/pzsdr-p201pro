@@ -40,8 +40,12 @@ No soldering is needed for console or JTAG; both are on the USB-C port.
 - In the stock design the Zynq GEM0 connects via EMIO (GMII) to a PL
   GMII-to-RGMII converter (`xlnx,gmii-to-rgmii-1.0`, MDIO address 8); the PHY is
   behind it at MDIO address 1. `phy-mode = "rgmii-rxid"`.
-- PHY reset/control is a GPIO: EMIO13, `gpio-973`, kernel label "reset". This is
-  the pin affected by the GPIO clock gating bug (see `ethernet-regression.md`).
+- PHY reset/control is a GPIO: EMIO13, `gpio-973`, kernel label "reset". In the
+  stock bitstream it routes to package pins W18/W19 (`RIOB33_X73Y55`,
+  IO_L22P/N_T3_34, PULLDOWN). The new bitstream routes EMIO13 to a different pin,
+  R19 (`RIOB33_SING_X73Y99`), leaving W18/W19 undriven by EMIO — see
+  `bitstream-analysis.md` (#3). The stock-kernel RX regression itself is the
+  `GEM0_RCLK_CTRL.SRCSEL` bit, not this GPIO (see `ethernet-regression.md`).
 - The newer 5.15 firmware's devicetree instead describes a direct-RGMII design
   (PHY at MDIO address 0, no converter), which does not match the stock
   bitstream.
