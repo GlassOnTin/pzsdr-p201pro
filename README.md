@@ -114,3 +114,9 @@ See `docs/ps7-init-format.md`.
 Issues and merge requests welcome, especially: the 5.15 firmware MDIO topology,
 a clean QSPI environment repair, and schematic confirmation of the PHY control
 GPIO net.
+
+## Upstream contributions
+
+- prjxray build fixes (GCC 15 / CMake 4): [f4pga/prjxray#2578](https://github.com/f4pga/prjxray/pull/2578).
+- P201Pro ethernet diagnosis + fix: [plutoplus/plutoplus#70](https://github.com/plutoplus/plutoplus/issues/70).
+- FSBL GPIO_CLK_CTRL note for derivatives: [analogdevicesinc/plutosdr-fw#114](https://github.com/analogdevicesinc/plutosdr-fw/issues/114).
