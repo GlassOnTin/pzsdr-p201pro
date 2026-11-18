@@ -97,6 +97,15 @@ GEM0-MDIO-to-PHY trace:
    - Filling this needs prjxray-style fuzzing of the PS-PL interface (drive known
      EMIO signals, diff bitstreams) to document the PSS-wire <-> EMIO-signal map.
      That is a reusable zynq7 db contribution.
+   - Progress: querying Vivado (2025.2, `open_io_design` + `get_bel_pins` of the
+     PS7 site, mirroring fuzzers/076-ps7) extracts the **functional** EMIO wire
+     names: 441 EMIO ports -> `PSS2_X32Y105/PS7_EMIO*` wires
+     (`bitstream-analysis/ps7_emio_wires.csv`, script
+     `extract_ps7_emio_wires.tcl`). E.g. `EMIOENET0MDIOMDC ->
+     PSS2_X32Y105/PS7_EMIOENET0MDIOMDC`. The PS7 site has **zero site_pips**
+     (hard block), so the EMIO-wire -> fabric `PSS1_LOGIC_OUTS#` cross-tile
+     correspondence is not queryable from Vivado pin-planning mode; it is the
+     tileconn/fuzzer-documented relation still missing from the db.
 
 2. **IO-interconnect mux mapping.** IOB outputs reach the fabric via
    `OLOGIC.OMUX` / `ILOGIC.IMUX` selections; the mux-input -> IOI-wire relation
