@@ -159,6 +159,43 @@ no PHY on MDIO. Diagnosed purely from the two bitstreams + prjxray db, no vendor
 schematic required. The fix is to restore the MDIO routing + IOB in the new
 PL design (or use the stock converter bitstream).
 
+## Functional isolation of #1 by JTAG bitstream swap (no scope)
+
+The structural trace above was confirmed functionally by hot-swapping the PL
+bitstream over JTAG while the stock Linux kept running, so the FSBL and kernel
+were held constant. OpenOCD (`pld load 0 <file.bit>`, virtex2 pld driver via the
+`zynq_pl.bs` TAP) reconfigures the PL; the PS keeps running. No boot-mode switch
+change is needed — the Zynq JTAG DAP is accessible in any boot mode.
+
+MDIO was read directly from the GEM0 PHY maintenance register (`0xE000B034`)
+with `devmem`: a clause-22 read of PHY addr 1 reg 2/3 (PHY ID) is
+`devmem 0xE000B034 32 0x608A0000` then read back (data in bits 15:0); reg 3 is
+`0x608E0000`.
+
+| PL bitstream (FSBL/kernel = stock throughout) | MDIO PHY ID read | eth0 |
+|---|---|---|
+| stock | `0x001C` / `0xC916` (= `0x011cc916`) | carrier 1 |
+| new (2026-11-16) | `0x0000` / `0x0000` | carrier 0, link flap, ping 100% loss |
+| stock (reloaded) | `0x001C` / `0xC916` | carrier 1 |
+
+So the new bitstream **alone** strands GEM0 MDIO: with the stock FSBL
+(`SRCSEL=EMIO`) and stock kernel unchanged, loading the new PL bitstream makes
+the PHY ID read return 0 and the link drop; reloading the stock bitstream
+restores the PHY ID. This isolates #1 to the PL bitstream, independent of the
+FSBL/kernel, and matches the structural trace (no MDIO IOB in the new design).
+
+Method notes:
+- OpenOCD's virtex2 `pld load` needs the bitstream dummy preamble
+  (`0xFFFFFFFF` x8, `0x000000BB`, `0x11220044`, `0xFFFFFFFF` x2) before the sync
+  word `0xAA995566`. The raw QSPI bitstream with that preamble stripped fails to
+  load over JTAG; prepending the stock preamble fixes it
+  (`sd-firmware/new_system_top_fixed.bit`).
+- Hot-swapping the PL while Linux runs glitches the RGMII data path. After the
+  swap, a warm reboot, PHY software reset (BMCR bit 15), and macb unbind/rebind
+  restored MDIO and link but not the data path (PHY links at 1 Gbps, frames do
+  not pass). A full power cycle is needed to re-initialize the PHY/RGMII cleanly.
+  This is a recovery artifact of the experiment, not part of the diagnosis.
+
 ## Definitive result for #3 (the "reset" GPIO net — AD9361, not the PHY)
 
 The same tracer resolves the GPIO the kernel labels "reset" (`gpio-973`,
