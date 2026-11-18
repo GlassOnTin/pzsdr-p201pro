@@ -149,12 +149,21 @@ no PHY on MDIO. Diagnosed purely from the two bitstreams + prjxray db, no vendor
 schematic required. The fix is to restore the MDIO routing + IOB in the new
 PL design (or use the stock converter bitstream).
 
-## Definitive result for #3 (PHY reset GPIO net)
+## Definitive result for #3 (the "reset" GPIO net — AD9361, not the PHY)
 
-The same tracer resolves the PHY reset/control GPIO. The kernel labels it
-"reset" (`gpio-973`, EMIO13). Its PS7 output wire is `PS7_EMIOGPIOO13`, linked to
-the fabric by the fixed PIP `PSS2.PSS2_LOGIC_OUTS1_76.PS7_EMIOGPIOO13 always`
-(`ppips_pss2.db`). Tracing that wire through the active routing graph:
+The same tracer resolves the GPIO the kernel labels "reset" (`gpio-973`,
+EMIO13). **This is the AD9361 reset, not the ethernet PHY reset.** The only
+`reset-gpios` in either devicetree is in the `ad9361-phy@0` node
+(`reset-gpios = <&gpio0 67 0>`; offset 67 = EMIO13). Neither DT has an
+ethernet-PHY reset GPIO and there is no GPIO hog. Confirmed on the running stock
+board: `gpiochip0` base 906, `gpio-973` ("reset") out hi, the `ad9361-phy` IIO
+device probed; the RTL8211F is at MDIO address 1 behind the converter at address
+8 (`phy_id 0x011cc916`) with no reset GPIO. The earlier "PHY reset GPIO" framing
+misread the kernel label.
+
+The traced PS7 output wire is `PS7_EMIOGPIOO13`, linked to the fabric by the
+fixed PIP `PSS2.PSS2_LOGIC_OUTS1_76.PS7_EMIOGPIOO13 always` (`ppips_pss2.db`).
+Tracing that wire through the active routing graph:
 
 | bitstream | EMIO13 output reaches | package pin | bank 34 function |
 |---|---|---|---|
@@ -174,18 +183,24 @@ New path (23 hops) ends at `RIOI3_SING_X73Y99/IOI_OLOGIC0_D1 -> RIOI_OLOGIC0_OQ`
 OLOGIC1) is a 4-node component with **no PS7 EMIO driver** — the reset GPIO no
 longer reaches W18/W19.
 
-**Conclusion:** the stock design drives the PHY reset net from EMIO13 on
+**Conclusion:** the stock design drives the AD9361 RESETB net from EMIO13 on
 W18/W19; the new direct-RGMII design routes EMIO13 to R19 instead. The IOB site
 `RIOB33_X73Y55` is still *configured* in the new bitstream (`in_new=1` in the
-pinmap), but configuring the site is not the same as routing the reset signal to
-it — an earlier reading of the pinmap alone missed this. So the new PL design
-changes the reset GPIO pin as well as stranding MDIO (#1). Both are consistent
-with the new bitstream targeting a different board revision/pinout.
+pinmap), but configuring the site is not the same as routing the signal to it —
+an earlier reading of the pinmap alone missed this. So the new PL design changes
+the AD9361 reset pin as well as stranding MDIO (#1), consistent with it targeting
+a different board revision/pinout.
 
-Caveat: which RTL8211F pin W18/W19 (or R19) physically drives is inferred from
-the kernel "reset" label and the stock routing; confirming the PCB net (RESETB)
-needs the schematic. The bitstream routing difference itself is verified by BFS
-on both decoded bitstreams.
+The **ethernet PHY (RTL8211F) reset is a separate net and is not a PS7 GPIO** in
+either design; it is likely PL-driven or a hardware power-on reset. It has not
+been traced. Identifying it needs a scope probe on the PHY PHYRSTB pin (pin 12,
+QFN-48) at boot, or the schematic.
+
+Caveat: W18/W19 (stock) / R19 (new) carrying the AD9361 RESETB is inferred from
+the DT `reset-gpios` and the stock routing; the AD9361 pin it reaches is not
+confirmed against a schematic. The bitstream routing difference itself is
+verified by BFS on both decoded bitstreams, and the GPIO attribution by the DT
+plus the running board's GPIO/IIO state.
 
 ## Limitations
 

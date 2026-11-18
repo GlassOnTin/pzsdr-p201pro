@@ -128,11 +128,11 @@ persists and why direct writes to it take effect.
 - The register-level cause (`GEM0_RCLK_CTRL.SRCSEL`) and fix are verified by
   bisection and direct write; this is the stock-kernel RX fault, independent of
   the PHY reset GPIO.
-- The PHY reset GPIO (EMIO13, `gpio-973`, kernel label "reset") traces to W18/W19
+- The kernel "reset" GPIO (EMIO13, `gpio-973`) is the **AD9361** reset (DT
+  `ad9361-phy@0 reset-gpios`), not the PHY reset. It traces to W18/W19
   (`RIOB33_X73Y55`) in the stock bitstream but to R19 (`RIOB33_SING_X73Y99`) in
-  the new bitstream, which leaves W18/W19 undriven by EMIO. Which RTL8211F pin
-  W18/W19 drives (RESETB) is inferred; confirming the PCB net needs the
-  schematic. See `bitstream-analysis.md` (#3).
+  the new one. The RTL8211F reset is a separate net, not a PS7 GPIO, and is not
+  traced. See `bitstream-analysis.md` (#3).
 - The 5.15 firmware MDIO failure is characterized, not fixed.
 - The QSPI environment corruption is repaired and verified (see
   `../fix/qspi-env.md`); QSPI now autoboots cleanly.
