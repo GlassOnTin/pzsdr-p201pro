@@ -1,0 +1,5 @@
+set_property PACKAGE_PIN M14 [get_ports ENET0_MDIO_MDC]
+set_property PACKAGE_PIN L14 [get_ports ENET0_MDIO_O]
+set_property PACKAGE_PIN N15 [get_ports ENET0_MDIO_T]
+set_property PACKAGE_PIN J14 [get_ports ENET0_MDIO_I]
+set_property IOSTANDARD LVCMOS33 [get_ports {ENET0_MDIO_*}]

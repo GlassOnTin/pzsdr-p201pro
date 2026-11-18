@@ -115,13 +115,48 @@ With those two mappings, the tracer can walk GEM0's EMIO MDIO port through the
 active PIPs to the bank-35 PHY IOB and compare stock vs new — a bitstream-only
 diagnosis of #1, and the reset-GPIO net for #3.
 
+## Definitive result for #1 (bitstream-only, no vendor files)
+
+The key was loading the fixed "always" pseudo-PIPs from `ppips_pss2.db` (family
+level `zynq7/`, keyed by tile *type* `PSS2`, expanded to every instance). These
+hardwired PIPs link the PS7 EMIO wires to the fabric `PSS2_LOGIC_OUTS*` wires and
+are not in the bitstream FASM. `route_trace.py` now loads them (`ppips_edges`).
+The EMIO->LOGIC_OUTS map for GEM0 MDIO is in the db, e.g.:
+
+```
+PSS2.PSS2_LOGIC_OUTS5_67.PS7_EMIOENET0MDIOMDC always   (MDC)
+PSS2.PSS2_LOGIC_OUTS0_66.PS7_EMIOENET0MDIOO  always   (data out)
+PSS2.PSS2_LOGIC_OUTS1_66.PS7_EMIOENET0MDIOTN always   (tristate)
+PSS2.PS7_EMIOENET0MDIOI.PSS2_IMUX_B0_66      always   (data in)
+```
+
+Tracing `PSS2_X32Y105/PS7_EMIOENET0MDIOMDC` (and `...MDIOO`) through the active
+routing graph:
+
+| bitstream | MDIO component | reaches IOB? |
+|---|---|---|
+| stock | 29 nodes: INT_R/INT_L fabric + RIOI3 | **yes -> RIOI3_X73Y145** |
+| new (2026-11-16) | 4 nodes: PSS3/INT_L/PSS2 only | **no IOB** |
+
+`RIOI3_X73Y145` -> `RIOB33_X73Y145` -> package pins **A20/B19** (bank 35), the
+RTL8211F MDIO pins. The IOB pinmap confirms `RIOB33_X73Y145` is `in_stock=1,
+in_new=0`.
+
+**Conclusion:** the stock bitstream routes GEM0 MDIO to the PHY MDIO IOB
+(A20/B19); the new direct-RGMII bitstream strands GEM0 MDIO (no path to any IOB)
+and does not configure the MDIO IOB at all. This is why the 5.15 firmware finds
+no PHY on MDIO. Diagnosed purely from the two bitstreams + prjxray db, no vendor
+schematic required. The fix is to restore the MDIO routing + IOB in the new
+PL design (or use the stock converter bitstream).
+
 ## Limitations
 
-- prjxray recovers IOB pin usage/IOSTANDARD/pull/drive, **not** the internal
-  signal-to-pin routing or net names. So this confirms the topology change
-  (converter removed, RGMII retained) and localizes the MDIO fault to internal
-  routing, but cannot prove the exact misconnection.
-- Confirming/fixing the MDIO routing needs the vendor's Vivado project / XDC
-  constraints, or a scope probe on the PHY MDIO pins.
+- With the `ppips_*.db` "always" PIPs loaded, `route_trace.py` traces internal
+  signal routing (PS7 EMIO -> fabric -> IOB), not just pin usage. This proved the
+  MDIO misconnection above without vendor files. Net *names* are still not in the
+  bitstream; signals are identified by their PS7 EMIO port / IOB pin.
+- The trace reflects connectivity, not timing/electrical correctness. Fixing the
+  new PL design's MDIO routing still needs the vendor Vivado project (or a
+  rebuild); the diagnosis itself no longer does.
 - The `?` pin entries in the CSV are IOB sites with no entry in
   `package_pins.csv` (dedicated/unbonded pins); they are stock-only GMII pins.
