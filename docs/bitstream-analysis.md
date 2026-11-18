@@ -130,17 +130,27 @@ PSS2.PSS2_LOGIC_OUTS1_66.PS7_EMIOENET0MDIOTN always   (tristate)
 PSS2.PS7_EMIOENET0MDIOI.PSS2_IMUX_B0_66      always   (data in)
 ```
 
-Tracing `PSS2_X32Y105/PS7_EMIOENET0MDIOMDC` (and `...MDIOO`) through the active
-routing graph:
+Tracing all four GEM0 MDIO EMIO wires through the active routing graph
+(component size / IO tiles reached):
 
-| bitstream | MDIO component | reaches IOB? |
+| EMIO wire | stock | new (2026-11-16) |
 |---|---|---|
-| stock | 29 nodes: INT_R/INT_L fabric + RIOI3 | **yes -> RIOI3_X73Y145** |
-| new (2026-11-16) | 4 nodes: PSS3/INT_L/PSS2 only | **no IOB** |
+| `...MDIOMDC` (clock out) | 29 nodes -> **RIOI3_X73Y145** | 4 nodes, no IOB |
+| `...MDIOO` (data out) | 30 nodes -> **RIOI3_X73Y145** | 4 nodes, no IOB |
+| `...MDIOTN` (tristate) | 16 nodes, no IOB* | 4 nodes, no IOB |
+| `...MDIOI` (data in) | 15 nodes, no IOB* | 36 nodes, no IOB |
+
+\* The tracer walks forward from the EMIO wire, so it shows the output signals
+(MDC, MDIOO) reaching the IOB. The tristate (TN) drives the IOB T-pin through a
+separate IOI mux, and MDIOI is an input (IOB -> EMIO, the reverse direction), so
+neither appears in the forward component even in stock. Stock MDIO demonstrably
+works (the kernel reads PHY ID `0x011cc916`), so TN/MDIOI do reach the IOB
+functionally; the table reflects the tracer's direction, not a disconnection.
 
 `RIOI3_X73Y145` -> `RIOB33_X73Y145` -> package pins **A20/B19** (bank 35), the
 RTL8211F MDIO pins. The IOB pinmap confirms `RIOB33_X73Y145` is `in_stock=1,
-in_new=0`.
+in_new=0`. In the new bitstream **none** of the four MDIO signals reaches any
+IOB — the whole GEM0 MDIO interface is stranded.
 
 **Conclusion:** the stock bitstream routes GEM0 MDIO to the PHY MDIO IOB
 (A20/B19); the new direct-RGMII bitstream strands GEM0 MDIO (no path to any IOB)

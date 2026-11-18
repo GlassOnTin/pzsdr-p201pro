@@ -55,6 +55,24 @@ Any one of these restores RX on the stock firmware:
 Verified: with `0x138=0x11`, bidirectional ping passes (0% loss), `rx_packets`
 increments.
 
+## Live toggle test (scope-free, on the bench)
+
+Run on the stock QSPI board (Linux 5.10, eth0 192.168.0.168, gateway
+192.168.0.1), console over the USB-gadget ACM port. Toggling bit 4 of
+`0xF8000138` while pinging the gateway, reading `rx_packets` before/after each
+3-packet ping:
+
+| stage | `0x138` | SRCSEL | ping | `rx_packets` delta |
+|---|---|---|---|---|
+| baseline | `0x11` | EMIO | 3/3, 0% loss, 0.6 ms | +12 |
+| clear bit 4 | `0x01` | MIO | 0/3, **100% loss** | **0 (frozen)** |
+| restore | `0x11` | EMIO | 3/3, 0% loss, 0.6 ms | +22 |
+
+Clearing SRCSEL freezes RX immediately (`rx_packets` stops, ping 100% loss);
+setting it resumes RX. TX and the 1 Gbps link stay up throughout. The board was
+left at `0x11` (working). This demonstrates the root cause live, reversibly,
+without a scope. SLCR must be unlocked first (`devmem 0xF8000008 32 0xDF0D`).
+
 ## Note on the 5.15 firmware
 
 This fixes the stock-kernel RX fault. The newer Linux 5.15 firmware has a
