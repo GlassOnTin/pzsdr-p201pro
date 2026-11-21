@@ -59,10 +59,14 @@ interface is harder for two reasons:
 
   1. The rx/tx pins use ILOGIC ISERDES / OLOGIC ODDR DDR cells, not the
      simple OMUX/IMUX that route_trace.py --iomux handles. The default
-     cell muxes are not in the FASM. ppips_rioi3.db does define the
-     ILOGIC/ODELAY Q -> IOI_LOGIC_OUTS fabric links, so the IOB<->fabric
-     path is partially modelable, but the tracer's iomux_edges uses wire
-     names (OLOGIC_Y0_OMUX_*) that do not match the db IOI_* wires.
+     cell muxes are not in the FASM. ppips_rioi3.db defines
+     ILOGIC/ODELAY Q -> IOI_LOGIC_OUTS links, but the db stops at the IOI
+     routing wires (IOI_ILOGIC*_Q): it does not model the link from those
+     wires through the ILOGIC/OLOGIC cell to the IOB pin, so querying
+     IOI_LOGIC_OUTS* yields a tiny component (size 0-3) that never reaches
+     the fabric backbone or the IP. The rx data tiles are also special
+     clock-capable types (RIOI3_TBYTESRC_X73Y57/Y69,
+     RIOI3_TBYTETERM_X73Y63), needing their own ppips.
 
   2. Even with the IOB linked to the fabric, the FASM carries no design
      hierarchy: the axi_ad9361 rx_data_in[0..11]/tx_data_out[0..11] port
