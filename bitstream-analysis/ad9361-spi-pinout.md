@@ -197,3 +197,16 @@ the Maia design SPI MISO connection/routing (spi_miso->spi0_sdi_i->PS7
 SPI0_MISO_I), not the pin constr. Fix: investigate the Maia BD SPI MISO
 path so Vivado routes U12->PS7 SPI0_MISO_I; the stock PIPs above are the
 reference for the required routing.
+
+## SPI MISO net UNROUTED; route_design does not route it
+
+Vivado implemented-design check: spi_miso_IBUF and spi0_sdi_i ->
+sys_ps7/SPI0_MISO_I nets are ROUTE_STATUS=UNROUTED (port correctly at
+IOB_X1Y95=U12). The BD connection is correct (ad_connect spi0_sdi_i
+sys_ps7/SPI0_MISO_I, matches ADI reference). Re-running route_design on
+the routed checkpoint completes with 0 errors but does NOT route the MISO
+net: the regenerated bitstream still lacks INT_L_X18Y83.SS6BEG2.LVB_L0 and
+the other stock MISO PIPs (29 PIPs vs stock 36). So Vivado is leaving the
+PS7 SPI0_MISO_I input net unrouted (defaulting to GND/floating). Next:
+find why route_design skips this net (PS7 SPI0_MISO_I input handling /
+whether the SPI0 peripheral input is marked used), or force-route it.
