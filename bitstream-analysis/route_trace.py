@@ -241,8 +241,11 @@ def site_logic_edges(fasm_path, uf, tilegrid):
                 tile, logic, y, rest = m.groups()
                 cfg[(tile, logic, int(y))].add(rest)
     for (tile, logic, y), feats in cfg.items():
+        # Cell-pin wires carry a side prefix (RIOI_/LIOI_); the IOI_ output
+        # wires (ILOGIC Q1/Q2/O, OLOGIC D2) are common to both sides.
+        io = "RIOI" if tile.startswith("RIOI") else "LIOI"
         if logic == "ILOGIC":
-            dn = uf.find((tile, "RIOI_ILOGIC%d_D" % y))
+            dn = uf.find((tile, "%s_ILOGIC%d_D" % (io, y)))
             edges.append((dn, uf.find((tile, "IOI_ILOGIC%d_O" % y)),
                           "ILOGIC_D_O"))
             edges.append((dn, uf.find((tile, "IOI_ILOGIC%d_Q1" % y)),
@@ -260,7 +263,7 @@ def site_logic_edges(fasm_path, uf, tilegrid):
         elif logic == "OLOGIC":
             if any(f.startswith("ODDR") for f in feats):
                 edges.append((uf.find((tile, "IOI_OLOGIC%d_D2" % y)),
-                              uf.find((tile, "RIOI_OLOGIC%d_OQ" % y)),
+                              uf.find((tile, "%s_OLOGIC%d_OQ" % (io, y))),
                               "OLOGIC_D2_OQ"))
     return edges
 
