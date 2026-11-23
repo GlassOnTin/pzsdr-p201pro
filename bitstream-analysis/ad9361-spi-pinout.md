@@ -210,3 +210,15 @@ the other stock MISO PIPs (29 PIPs vs stock 36). So Vivado is leaving the
 PS7 SPI0_MISO_I input net unrouted (defaulting to GND/floating). Next:
 find why route_design skips this net (PS7 SPI0_MISO_I input handling /
 whether the SPI0 peripheral input is marked used), or force-route it.
+
+## Force-route also fails; PS7 SPI0_MISO_I input left unrouted
+
+route_design -nets [get_nets -hier *spi_miso*] completes 0 errors but the
+regenerated bitstream STILL lacks INT_L_X18Y83.SS6BEG2.LVB_L0 (29 PIPs vs
+stock 36). Vivado consistently leaves the PS7 SPI0_MISO_I EMIO input net
+unrouted. The BD connection and pin constr are correct; the stock design
+routes the same net. Suspect the Maia PS7 SPI0 EMIO configuration
+(PCW_SPI0_SPI0_IO / PCW_SPI0_PERIPHERAL_ENABLE) differs from stock in a way
+that makes Vivado treat the MISO input as not needing PL routing. Next:
+compare Maia vs stock PS7 SPI0 PCW parameters, or route the MISO input
+manually (the stock INT_L_X18Y83 PIPs are the reference).
