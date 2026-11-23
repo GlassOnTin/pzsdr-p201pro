@@ -125,3 +125,21 @@ SLICE LUTs. The per-bit g_rx_data cells are identical logic, so the bit order
 is placement-dependent and not recoverable from LUT init patterns. BIST
 (PN-sequence capture) is the reliable way to fix the bit order and confirm
 enable/txnrx; the axi_ad9361 PN monitor + ad9361_bist_prbs driver support it.
+
+## BIST bitstream built + flashed; AD9361 SPI still 0xFF
+
+PZSDR constr applied, bitstream built (timing met) after fixing two Vivado
+2025.2 environment blockers: (1) /etc/os-release fields leaking into the
+generated system.v header as uncommented Verilog (simplified os-release);
+(2) libncurses.so.5 missing in the Ubuntu 24.04 container (symlinked .so.6).
+FIT repackaged (Maia kernel/rootfs + new bitstream + DTB refclk hog +
+spi-cpol), flashed via DFU, boots (ssh/RNDIS up, axi_ad9361 0x000A0300).
+
+But ad9361_spi_check still reads PRODUCT_ID 0xFF. FIT bitstream verified:
+SPI clk/csn (T10/T11, Y97 OLOGIC OMUX.D1+OQUSED) and resetb (W19, Y55.Y1)
+match stock exactly; SPI SCLK/SS0 traces reach RIOI3_X73Y97. SPI MISO
+(U12, Y95.Y1, ISERDES.MASTER like stock) input path does NOT complete to
+PS7 SPI0_MISO_I in the trace (component stops at INT, no IOB) — the Maia
+design's SPI MISO input fabric routing differs from stock. refclk hog
+(gpio-954 clock_extern_en out hi) is applied. Next: investigate the Maia
+axi_ad9361 SPI MISO input routing (ILOGIC->IOI_LOGIC_OUTS->INT->PS7 path).
