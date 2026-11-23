@@ -176,3 +176,24 @@ disconnected in both FIT and stock despite the empirical difference
 To finish: derive the PSS_IMUX_B0_y <- INT_L/INT_R wire mapping (Zynq TRM
 EMIO input mux table, or prjxray fuzzing) and add it to the db/tracer, then
 the FIT-vs-stock MISO INT-fabric routing divergence becomes traceable.
+
+## DIVERGENCE FOUND: FIT bitstream missing SPI MISO INT-fabric routing PIPs
+
+The MISO input INT_L tile is INT_L_X18Y83 (grid 51,69; via PSS_IMUX_B0_13 <-
+INT_INTERFACE_PSS_IMUX_B0 <- INT_L.IMUX_L0). FASM diff FIT vs stock:
+both have IMUX_L0.GFAN0 + GFAN0.GND_WIRE, but STOCK has extra routing PIPs
+the FIT LACKS:
+  INT_L_X18Y83.EE2BEG0.SS6END0
+  INT_L_X18Y83.NN2BEG2.WR1END2
+  INT_L_X18Y83.SE6BEG2.SS6END2
+  INT_L_X18Y83.SS6BEG1.SS6END1
+  INT_L_X18Y83.SS6BEG2.LVB_L0   (MISO via long-vertical-bus)
+  INT_L_X18Y83.SS6BEG3.SS6END3
+  INT_L_X18Y83.SW6BEG1.SE6END1
+These route the AD9361 MISO (U12) through the INT fabric to the PS7 SPI0
+MISO input. The FIT (Maia-design) bitstream did not route them, so the FIT
+SPI MISO floats (0xFF) while stock reads the AD9361 (0x00). Root cause is
+the Maia design SPI MISO connection/routing (spi_miso->spi0_sdi_i->PS7
+SPI0_MISO_I), not the pin constr. Fix: investigate the Maia BD SPI MISO
+path so Vivado routes U12->PS7 SPI0_MISO_I; the stock PIPs above are the
+reference for the required routing.
