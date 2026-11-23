@@ -222,3 +222,15 @@ routes the same net. Suspect the Maia PS7 SPI0 EMIO configuration
 that makes Vivado treat the MISO input as not needing PL routing. Next:
 compare Maia vs stock PS7 SPI0 PCW parameters, or route the MISO input
 manually (the stock INT_L_X18Y83 PIPs are the reference).
+
+## BD/PCW correct; Vivado 2025.2 leaves PS7 SPI0_MISO_I unrouted
+
+Maia pluto BD PS7 SPI0 params IDENTICAL to ADI reference:
+PCW_SPI1_PERIPHERAL_ENABLE 0, PCW_SPI0_PERIPHERAL_ENABLE 1,
+PCW_SPI0_SPI0_IO EMIO, ad_connect spi0_sdi_i sys_ps7/SPI0_MISO_I.
+So BD/constr/PCW all correct, yet Vivado 2025.2 route_design (and -nets
+force) leaves the SPI MISO EMIO input UNROUTED; the stock design (built
+with an earlier Vivado) routes it. Likely a Vivado 2025.2 PS7 EMIO input
+routing regression. Options: build the Maia bitstream with Vivado 2023.2
+(the ADI-tested version), or manually insert the stock MISO routing PIPs
+(INT_L_X18Y83.SS6BEG2.LVB_L0 etc.) into the bitstream.
