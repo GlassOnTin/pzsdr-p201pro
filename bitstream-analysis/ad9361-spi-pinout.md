@@ -103,3 +103,25 @@ Maia and stock placements) or a hardware BIST PN-sequence capture to
 deduce the permutation. The tx data pins need the analogous OLOGIC-side
 trace. SPI + resetb + rx_clk + rx_frame + the rx_data pin SET are verified;
 the rx/tx bit order and tx pin set remain.
+
+## OLOGIC output classification + enable/txnrx candidates
+
+Classifying the stock OLOGIC cells by config: ODDR outputs (tx_data,
+tx_clk, tx_frame, gpio_ctl) vs OBUFT/OMUX.D1 outputs (SPI, resetb, enable,
+txnrx, gpio_en_agc, clk_out). The OBUFT outputs are T10/T11/T12 (SPI),
+W19 (resetb), and A20/B19/P18/M18/Y149-Y1. Of these, only A20 and B19 have
+an IP CLB connection (CLBLM_L_X58Y130 / X60Y130); P18/M18/Y149 have none.
+So **enable/txnrx are A20 and B19** (order TBD by BIST). The IP hierarchy
+(confirmed from the Maia axi_ad9361 OOC netlist) is
+inst/i_dev_if/g_rx_data[0..11].i_rx_data, g_tx_data[0..11].i_tx_data,
+i_enable, i_txnrx, i_rx_frame, i_tx_clk, i_tx_frame, plus i_rx/i_rx_channel_*/
+i_rx_pnmon/i_pnmon (the BIST PN monitor).
+
+Deeper prjxray gap: tracing THROUGH the IP (enable/txnrx output side, and
+the rx/tx bit order) is blocked because the IP's SLICE LUT input->output
+internal paths are not modeled (the input LUT and output FF are in different
+SLICEs). site_logic_edges covers the IOB ILOGIC/OLOGIC cells but not fabric
+SLICE LUTs. The per-bit g_rx_data cells are identical logic, so the bit order
+is placement-dependent and not recoverable from LUT init patterns. BIST
+(PN-sequence capture) is the reliable way to fix the bit order and confirm
+enable/txnrx; the axi_ad9361 PN monitor + ad9361_bist_prbs driver support it.
