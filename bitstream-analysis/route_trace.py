@@ -214,6 +214,57 @@ def iomux_edges(fasm_path, uf, tilegrid):
     return edges
 
 
+def site_logic_edges(fasm_path, uf, tilegrid):
+    """Model ILOGIC/OLOGIC cell-internal data paths (the IOB logic gap).
+
+    The prjxray ppips link cell pins to IOI wires (RIOI_ILOGIC0_D <- RIOI_I0,
+    IOI_LOGIC_OUTS0_1 <- IOI_ILOGIC0_Q1) and model OLOGIC D1->OQ, but the
+    ILOGIC cell-internal D->O/Q data path is absent from the db, so an input
+    pin never reaches the fabric backbone. Add D->O (combinatorial bypass)
+    and D->Q1 (IFF/IDDR/ISERDES) for every ILOGIC cell present in the FASM,
+    D->Q2 when IDDR/ISERDES is used, and D->Q3..Q8 for ISERDES. Also add
+    OLOGIC D2->OQ for ODDR. This completes the IOB->ILOGIC->fabric chain so
+    rx data and SPI MISO can be traced to the fabric. Config-aware: the
+    registered outputs are added per the cell's FASM mode, not unconditionally.
+    """
+    edges = []
+    cell_re = re.compile(
+        r"^((?:RIOI3|LIOI3|RIOI3_TBYTESRC|RIOI3_TBYTETERM|RIOI3_SING|"
+        r"LIOI3_SING|LIOI3_TBYTESRC|LIOI3_TBYTETERM)_X\d+Y\d+)\."
+        r"(ILOGIC|OLOGIC)_Y(\d+)\.([A-Z0-9_.]+)$")
+    cfg = defaultdict(set)
+    with open(fasm_path) as f:
+        for line in f:
+            feat = line.strip().split()[0] if line.strip() else ""
+            m = cell_re.match(feat)
+            if m:
+                tile, logic, y, rest = m.groups()
+                cfg[(tile, logic, int(y))].add(rest)
+    for (tile, logic, y), feats in cfg.items():
+        if logic == "ILOGIC":
+            dn = uf.find((tile, "RIOI_ILOGIC%d_D" % y))
+            edges.append((dn, uf.find((tile, "IOI_ILOGIC%d_O" % y)),
+                          "ILOGIC_D_O"))
+            edges.append((dn, uf.find((tile, "IOI_ILOGIC%d_Q1" % y)),
+                          "ILOGIC_D_Q1"))
+            iddr = any(f.startswith("IDDR") for f in feats)
+            iserdes = any(f.startswith("ISERDES") and "IN_USE" in f
+                          for f in feats)
+            if iddr or iserdes:
+                edges.append((dn, uf.find((tile, "IOI_ILOGIC%d_Q2" % y)),
+                              "ILOGIC_D_Q2"))
+            if iserdes:
+                for q in range(3, 9):
+                    edges.append((dn, uf.find((tile, "IOI_ILOGIC%d_Q%d" % (y, q))),
+                                  "ILOGIC_D_Q%d" % q))
+        elif logic == "OLOGIC":
+            if any(f.startswith("ODDR") for f in feats):
+                edges.append((uf.find((tile, "IOI_OLOGIC%d_D2" % y)),
+                              uf.find((tile, "RIOI_OLOGIC%d_OQ" % y)),
+                              "OLOGIC_D2_OQ"))
+    return edges
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--db-root", required=True)
@@ -233,6 +284,7 @@ def main():
     uf, type_to_tiles, grid_to_tile = build_nodes(tilegrid, tileconn)
     edges = active_pip_edges(args.fasm, uf, tilegrid, wiresets)
     edges += ppips_edges(args.db_root, args.part, uf, type_to_tiles)
+    edges += site_logic_edges(args.fasm, uf, tilegrid)
     if args.iomux:
         edges += iomux_edges(args.fasm, uf, tilegrid)
     print("active routing PIP edges: %d" % len(edges), file=sys.stderr)
