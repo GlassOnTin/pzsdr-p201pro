@@ -143,3 +143,20 @@ PS7 SPI0_MISO_I in the trace (component stops at INT, no IOB) — the Maia
 design's SPI MISO input fabric routing differs from stock. refclk hog
 (gpio-954 clock_extern_en out hi) is applied. Next: investigate the Maia
 axi_ad9361 SPI MISO input routing (ILOGIC->IOI_LOGIC_OUTS->INT->PS7 path).
+
+## SPI MISO divergence: FIT vs stock bitstream (empirical, not yet localized)
+
+Decisive test on the same board: stock bitstream (fpga_manager) mode 3 ->
+PRODUCT_ID 0x00 (MISO driven); FIT PZSDR bitstream mode 3 -> 0xFF (MISO
+floats). resetb toggle (0->1) + refclk hog did not change the FIT result.
+
+FASM comparison FIT vs stock is IDENTICAL at every level checked: SPI MISO
+IOB_Y1 + ILOGIC_Y1 (ISERDES.MASTER, IDELMUXE3.P1, ZINV_D), SPI clk/csn
+OLOGIC (OMUX.D1+OQUSED), resetb W19 OLOGIC, INT_R_X73Y95 (NW6BEG0.LOGIC_OUTS18),
+INT_L_X18Y143 (GFAN), PSS2 (0 FASM PIPs - all ppips). The tracer shows the
+MISO input path (IOI_LOGIC_OUTS18_1 -> PSS2_IMUX_B0_93) disconnected in BOTH
+(the PS7 EMIO input mux is not fully modeled), so it cannot localize the
+divergence. The difference is in the INT-fabric routing of the SPI MISO
+input between the Maia and stock designs, not yet pinpointed. Next: full
+FASM diff of the INT tiles along the MISO NW6BEG0->PSS2 path, or extend the
+tracer's PS7 EMIO input-mux modeling.
