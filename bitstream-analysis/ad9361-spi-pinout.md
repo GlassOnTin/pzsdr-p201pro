@@ -78,3 +78,28 @@ cell connections via ppips_rioi3.db and recover the bit order from the
 axi_ad9361 IP netlist, or obtain the vendor P201Pro HDL/constraint files.
 The SPI + resetb pinout above is verified; the data-interface bit map is
 not yet recovered.
+
+## Progress: ILOGIC cell path modeled, rx data pins traced
+
+route_trace.py now has site_logic_edges() (commit 8fb999f): config-aware
+ILOGIC D->O/Q1 (and Q2 for IDDR, Q3..Q8 for ISERDES) plus OLOGIC D2->OQ.
+This completes the IOB->ILOGIC->fabric chain the db ppips left open. With
+it, the rx data IOI_LOGIC_OUTS components reach the axi_ad9361 IP CLB
+fabric (were size 0, now 41-54 with CLB wires).
+
+Tracing the rx-side input pins (stock.bit) gives the rx interface:
+
+  rx_clk_in   = N18  (RIOB33_X73Y73 Y1; component ~21883, global clock net)
+  rx_frame_in = R16  (RIOB33_X73Y61 Y0; component ~194)
+  rx_data (12 pins, bit order TBD):
+    V17 V18 (Y57)  R18 T17 (Y59)  V16 W16 (Y63)
+    Y18 Y19 (Y65)  V20 W20 (Y67)  T20 U20 (Y69)
+
+Each rx_data pin's component reaches a distinct set of axi_ad9361 IP CLB
+sites, but the sites are placement-scattered (X51-55, Y57-70), so the
+rx_data_in[0..11] BIT ORDER is not readable from the routing alone. It
+needs the axi_ad9361 IP netlist (port->SLICE mapping, matched across the
+Maia and stock placements) or a hardware BIST PN-sequence capture to
+deduce the permutation. The tx data pins need the analogous OLOGIC-side
+trace. SPI + resetb + rx_clk + rx_frame + the rx_data pin SET are verified;
+the rx/tx bit order and tx pin set remain.
