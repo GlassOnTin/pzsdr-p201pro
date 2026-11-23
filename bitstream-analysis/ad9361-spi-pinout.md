@@ -160,3 +160,19 @@ divergence. The difference is in the INT-fabric routing of the SPI MISO
 input between the Maia and stock designs, not yet pinpointed. Next: full
 FASM diff of the INT tiles along the MISO NW6BEG0->PSS2 path, or extend the
 tracer's PS7 EMIO input-mux modeling.
+
+## PS7 EMIO input-mux db gap localized (tracer extension target)
+
+The SPI MISO input chain traces: PSS2_IMUX_B0_93 (PS7_EMIOSPI0SI) <-
+PSS1_IMUX_B0_33 <- PSS_IMUX_B0_13. The last link PSS_IMUX -> INT fabric is
+ABSENT from the prjxray zynq7 db: no PSS tile type in tilegrid, no PSS<->INT
+tileconn, no PSS_IMUX in node_pattern_wires, and the 960 PSS_IMUX ppips
+(ppips_pss1.db) only map PSS1_IMUX_B0_xx <- PSS_IMUX_B0_y, never
+PSS_IMUX <- INT. So the tracer dead-ends at PSS_IMUX and cannot reach the
+IOB MISO via the INT fabric. This is why the MISO input path shows
+disconnected in both FIT and stock despite the empirical difference
+(stock mode3 0x00, FIT 0xFF).
+
+To finish: derive the PSS_IMUX_B0_y <- INT_L/INT_R wire mapping (Zynq TRM
+EMIO input mux table, or prjxray fuzzing) and add it to the db/tracer, then
+the FIT-vs-stock MISO INT-fabric routing divergence becomes traceable.
