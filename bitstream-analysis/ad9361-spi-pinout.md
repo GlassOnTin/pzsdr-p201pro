@@ -234,3 +234,55 @@ with an earlier Vivado) routes it. Likely a Vivado 2025.2 PS7 EMIO input
 routing regression. Options: build the Maia bitstream with Vivado 2023.2
 (the ADI-tested version), or manually insert the stock MISO routing PIPs
 (INT_L_X18Y83.SS6BEG2.LVB_L0 etc.) into the bitstream.
+
+## CORRECTION: MISO is ROUTED; the "UNROUTED / Vivado regression" finding was a checkpoint error
+
+The "SPI MISO net UNROUTED" conclusion above came from check_miso.tcl opening
+system_top.dcp, the PLACED (pre-route) checkpoint, not system_top_routed.dcp.
+Inspecting the routed DCP shows the MISO path fully connected and ROUTED:
+  spi_miso (IOB_X1Y95=U12) -> spi_miso_IBUF -> spi0_sdi_i ->
+  sys_ps7/SPI0_MISO_I -> PS7_i/EMIOSPI0MI   (every net ROUTE_STATUS=ROUTED)
+All four SPI nets route to the traced pins: clk=IOB_X1Y97(T10),
+csn=IOB_X1Y98(T11), mosi=IOB_X1Y96(T12), miso=IOB_X1Y95(U12), reaching PS7
+EMIOSPI0SCLKO/MO/SSON[0]/MI. On hardware the SPI0 controller enables and clocks
+during transfers (CR=0x7C3F, SLCR SPI0_CLK_CTRL CLKACT=1). Routing, pins and the
+SPI0 peripheral are NOT the problem; the "Vivado 2025.2 EMIO input routing
+regression" theory is withdrawn.
+
+The INT_L_X18Y83 "7 missing stock PIPs" was a red herring: IMUX_L0.GFAN0 (GND
+tie) is present in BOTH stock and FIT, so that IMUX is unused. The MISO fabric
+route is placement-dependent and FIT uses a different path than stock; copying
+stock PIPs cannot fix a placement-dependent route.
+
+## Hardware probe: MISO floats (0xFF); suspect is the Maia MISO ILOGIC config
+
+A cross-compiled static ARM spidev probe (/dev/spidev0.0, cmd
+AD_READ|AD_ADDR(0x037)=0x8037) reads PRODUCT_ID 0xFF in ALL four SPI modes;
+resetb (gpio-973 = EMIO13 = W19) and refclk (gpio-954 = MIO48) are both out hi.
+The AD9361 is not driving MISO. Loading the vendor PL bitstream via fpga_manager
+gave MISO=0x00 (driven) on the first load vs FIT 0xFF (floats), but the result
+became inconsistent after reset-GPIO manipulation, so this is indicative, not a
+clean controlled result.
+
+The MISO ILOGIC_Y1 (U12) cell config differs between vendor and FIT:
+  vendor stock.fasm: ISERDES.MODE.MASTER, IFF.SRTYPE.ASYNC, IDELMUXE3.P1, ZINV_D
+  FIT pzsdr.fasm:    IDDR.IN_USE + ISERDES.MODE.MASTER, IFF.ZINV_C (inverted
+                     clock), IFF.DDR_CLK_EDGE.SAME_EDGE, IFF.SRTYPE.SYNC,
+                     IFFDELMUXE3.P0, IDELMUXE3.P1, ZINV_D
+The FIT DDR input register with inverted clock is the suspect for MISO not
+reaching PS7 SPI0 correctly. NOT yet confirmed as root cause. Next: find where
+the FIT SPI MISO path infers IDDR/ZINV_C (axi_ad9361 IP or BD SPI MISO input
+handling) and match the vendor ISERDES/IFF config.
+
+## prjxray PSS2 EMIO input-mux gap (tracer completion, partial)
+
+ppips_pss2.db has ZERO PSS2_IMUX_B0_* selection entries (only the PS7 pin taps
+PS7_EMIO*.PSS2_IMUX_B0_*). The PSS1 stage mapping exists and follows
+PSS1_IMUX_B0_(20+n) <- PSS_IMUX_B0_n (ppips_pss1); PSS0 is identity. The
+PSS1<->PSS2 tileconn IMUX pairs are identity pass-through (PSS1_IMUX_B0_N on
+both sides). Adding the hypothesized hardwired selection
+PSS2.PSS2_IMUX_B0_93.PSS1_IMUX_B0_33 (SPI0 MISO) merges the PSS chain into the
+PS7 MISO component (23 -> 107 nodes, now incl PSS1 + INT_L), but the full
+IOB->PS7 trace still dead-ends because the INT fabric / INT_INTERFACE_PSS model
+has further gaps. Deriving the full PSS2_IMUX <- PSS1_IMUX table (Zynq TRM EMIO
+input mux or fuzzing) remains.
