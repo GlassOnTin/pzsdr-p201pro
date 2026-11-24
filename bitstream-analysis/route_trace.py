@@ -226,6 +226,13 @@ def site_logic_edges(fasm_path, uf, tilegrid):
     OLOGIC D2->OQ for ODDR. This completes the IOB->ILOGIC->fabric chain so
     rx data and SPI MISO can be traced to the fabric. Config-aware: the
     registered outputs are added per the cell's FASM mode, not unconditionally.
+
+    Verified end-to-end on a Zynq-7020 stock bitstream: the PS7 SPI0 SCLK output
+    traces to the T10 IOB OLOGIC (RIOI_OLOGIC0_OQ, 26 hops) and the MISO input
+    traces from U12 (RIOI_I1) back to PS7_EMIOSPI0MI (29 hops) through the ILOGIC
+    cell and the PSS0<->PSS1<->PSS2<->PSS3<->PSS4 EMIO input-mux tileconn chain.
+    The master-mode MISO is PS7_EMIOSPI0MI (PSS2_IMUX_B1_94); PSS2_IMUX_B0_93 is
+    the slave-mode input (SPI0SI), a different signal.
     """
     edges = []
     cell_re = re.compile(
