@@ -286,3 +286,32 @@ PS7 MISO component (23 -> 107 nodes, now incl PSS1 + INT_L), but the full
 IOB->PS7 trace still dead-ends because the INT fabric / INT_INTERFACE_PSS model
 has further gaps. Deriving the full PSS2_IMUX <- PSS1_IMUX table (Zynq TRM EMIO
 input mux or fuzzing) remains.
+
+## ROOT CAUSE FOUND: vendor firmware probes AD9361 (PRODUCT_ID 0x0A)
+
+Booted the full vendor FIT (sd-firmware/image.ub, model "PUZHI PZSDR P201PRO")
+via DFU to mtd3 (Maia BOOT.bin/u-boot kept in mtd0). The AD9361 probes:
+  ad9361 spi1.0: ad9361_probe : enter (ad9361)
+  ad9361 spi1.0: AD936x Rev 0 successfully initialized
+iio:device0 = ad9361-phy; iio_reg ad9361-phy 0x37 = 0x0A (AD9363). Hardware OK.
+
+Working vendor config (live /proc/device-tree + gpio):
+- AD9361 on the physical SPI0 controller (spi@e0006000), aliased **spi1** in the
+  vendor DTB (vendor spi0 = spi@e000d000 QSPI flash, spi-nor). Maia aliases
+  e0006000 as spi0; same physical controller, the bus-number alias is cosmetic.
+- SPI **mode1**: spi-cpha present, spi-cpol ABSENT. Maia added spi-cpol (mode3).
+- compatible "adi,ad9361" (Maia uses "adi,ad9363a").
+- reset-gpios = <&gpio0 67 0> = EMIO13 = W19 (identical to Maia).
+- adi,xo-disable-use-ext-refclk-enable present; external 40MHz refclk is an
+  always-on oscillator (no GPIO enable). Vendor gpio-954 (MIO48) = "ulpi resetb"
+  (USB PHY reset), NOT clock_extern_en. Maia's clock_extern_en hog on MIO48 is
+  wrong for PZSDR (MIO48 is USB reset); the refclk needs no GPIO enable.
+- SPI pins T10/T11/T12/U12 are SPI0 EMIO: PSS2_LOGIC_OUTS0_94 (SPI0 SCLKO) -> T10,
+  OUTS0_92 (SSON0) -> T11, OUTS2_94 (MO) -> T12, IMUX_B0_93 (SI/MISO) <- U12.
+  The Maia bitstream routes SPI0 EMIO to these pins: CORRECT.
+
+Maia DTB fixes indicated (zynq-plutoplus-z7020-maiasdr.dts): drop spi-cpol (use
+mode1 like vendor), set compatible "adi,ad9361", remove the clock_extern_en MIO48
+hog. The bitstream SPI routing is correct; the ILOGIC IDDR-vs-ISERDES difference
+is not in the combinatorial PS7 MISO path (IBUF -> spi0_sdi_i -> SPI0_MISO_I).
+NOT yet re-tested with the corrected DTB.
