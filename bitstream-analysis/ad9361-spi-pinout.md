@@ -274,18 +274,30 @@ reaching PS7 SPI0 correctly. NOT yet confirmed as root cause. Next: find where
 the FIT SPI MISO path infers IDDR/ZINV_C (axi_ad9361 IP or BD SPI MISO input
 handling) and match the vendor ISERDES/IFF config.
 
-## prjxray PSS2 EMIO input-mux gap (tracer completion, partial)
+## prjxray PSS2 EMIO input-mux: CORRECTION, the input trace works
 
-ppips_pss2.db has ZERO PSS2_IMUX_B0_* selection entries (only the PS7 pin taps
-PS7_EMIO*.PSS2_IMUX_B0_*). The PSS1 stage mapping exists and follows
-PSS1_IMUX_B0_(20+n) <- PSS_IMUX_B0_n (ppips_pss1); PSS0 is identity. The
-PSS1<->PSS2 tileconn IMUX pairs are identity pass-through (PSS1_IMUX_B0_N on
-both sides). Adding the hypothesized hardwired selection
-PSS2.PSS2_IMUX_B0_93.PSS1_IMUX_B0_33 (SPI0 MISO) merges the PSS chain into the
-PS7 MISO component (23 -> 107 nodes, now incl PSS1 + INT_L), but the full
-IOB->PS7 trace still dead-ends because the INT fabric / INT_INTERFACE_PSS model
-has further gaps. Deriving the full PSS2_IMUX <- PSS1_IMUX table (Zynq TRM EMIO
-input mux or fuzzing) remains.
+The earlier "PSS2 IMUX gap blocks MISO trace" was a wrong-pin artifact. The
+master-mode MISO is PS7_EMIOSPI0MI = PSS2_IMUX_B1_94 (B1 bank); PSS2_IMUX_B0_93
+is PS7_EMIOSPI0SI, the SLAVE-mode input, not the AD9361 MISO. Tracing the correct
+MI pin, the stock MISO input traces END-TO-END with site_logic_edges + the
+existing db (no new ppips needed):
+  RIOI3_X73Y95/RIOI_I1 (U12) -> ILOGIC -> INT_R NW6 chain -> WW4 ->
+  PSS4/PSS_IMUX_B1_14 -> PSS0_IMUX_B1_14 -> PSS3/PSS1_IMUX_B1_34 ->
+  PSS2/PS7_EMIOSPI0MI   (CONNECTED, 29 hops)
+The EMIO input mux chain is modeled by ppips_pss0/pss1 (PSS1_IMUX_B0_(20+n) <-
+PSS_IMUX_B0_n; B1 analogous) plus the PSS0<->PSS1<->PSS2<->PSS3<->PSS4 tileconn
+(the IMUX propagates up the PSS stack via tileconn, not ppips_pss2 selection
+entries — hence ppips_pss2 has 0 PSS2_IMUX dst entries). The combinatorial ILOGIC
+O output -> fabric link is also in the db (IOI_LOGIC_OUTS18_1 <- IOI_ILOGIC0_O).
+SPI outputs verified too: PS7_EMIOSPI0SCLKO -> RIOI3_X73Y97/RIOI_OLOGIC0_OQ (T10)
+CONNECTED, 26 hops. So site_logic_edges completes the IOB<->fabric input tracing.
+
+Remaining tracer limitation: the FIT Maia MISO input does NOT trace via the
+ILOGIC registered path (its ILOGIC_Y1 is IDDR; the PS7 MISO is the combinatorial
+IBUF->spi0_sdi_i->SPI0_MISO_I path confirmed in the routed netlist). The tracer
+models the ILOGIC cell path, not a pure IOB->IBUF->fabric bypass that skips the
+ILOGIC Q output; stock (ISERDES Q1) traces, FIT (combinatorial) does not. This is
+a modeling gap, not an unrouted net.
 
 ## ROOT CAUSE FOUND: vendor firmware probes AD9361 (PRODUCT_ID 0x0A)
 
