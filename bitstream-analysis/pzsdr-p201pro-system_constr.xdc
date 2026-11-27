@@ -1,4 +1,4 @@
-# PZSDR P201Pro (XC7Z020-2CLG400) AD9361 pinout — traced from stock.bit (prjxray FASM + package_pins.csv).
+# PZSDR P201Pro (XC7Z020-2CLG400) AD9361 pinout, traced from stock.bit (prjxray FASM + package_pins.csv).
 # Bank 34 (1.8V): AD9361 CMOS RX/TX, ENSM (enable/txnrx), resetb/en_agc, SPI0 EMIO, clk_out.
 # Bank 13 (1.8V): AD9361 gpio_status[7:0] and gpio_ctl[3:0] EMIO.
 
@@ -34,7 +34,7 @@ set_property -dict {PACKAGE_PIN T14 IOSTANDARD LVCMOS18} [get_ports tx_data_out[
 set_property -dict {PACKAGE_PIN W13 IOSTANDARD LVCMOS18} [get_ports tx_data_out[10]]
 set_property -dict {PACKAGE_PIN V12 IOSTANDARD LVCMOS18} [get_ports tx_data_out[11]]
 
-# AD9361 GPIO status (EMIO 0..7) and control (EMIO 8..11) — traced from PS7_EMIOGPIO
+# AD9361 GPIO status (EMIO 0..7) and control (EMIO 8..11), traced from PS7_EMIOGPIO
 set_property -dict {PACKAGE_PIN Y9  IOSTANDARD LVCMOS18} [get_ports gpio_status[0]]
 set_property -dict {PACKAGE_PIN W10 IOSTANDARD LVCMOS18} [get_ports gpio_status[1]]
 set_property -dict {PACKAGE_PIN Y8  IOSTANDARD LVCMOS18} [get_ports gpio_status[2]]
@@ -72,7 +72,7 @@ create_clock -name spi0_clk -period 40 [get_pins -hier */EMIOSPI0SCLKO]
 set_input_jitter clk_fpga_0 0.3
 set_input_jitter clk_fpga_1 0.15
 
-# PS7 DDR + fixed_io (MIO) — fixed Zynq pins
+# PS7 DDR + fixed_io (MIO), fixed Zynq pins
 set_property IOSTANDARD LVCMOS18 [get_ports *fixed_io_mio*]
 set_property SLEW SLOW [get_ports *fixed_io_mio*]
 set_property DRIVE 8 [get_ports *fixed_io_mio*]
@@ -195,3 +195,6 @@ set_property PACKAGE_PIN F2 [get_ports ddr_dqs_n[1]]
 
 set_false_path -from [get_pins {i_system_wrapper/system_i/axi_ad9361/inst/i_rx/i_up_adc_common/up_adc_gpio_out_int_reg[0]/C}]
 set_false_path -from [get_pins {i_system_wrapper/system_i/axi_ad9361/inst/i_tx/i_up_dac_common/up_dac_gpio_out_int_reg[0]/C}]
+
+# Compress XC7Z020 bitstream (~4.05 MB -> ~1.95 MB) so the FIT image fits U-Boot fit_size (0x1400000).
+set_property BITSTREAM.GENERAL.COMPRESS TRUE [current_design]
