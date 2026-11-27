@@ -17,6 +17,22 @@ use, modify, and redistribute under that license.
 - USB-C is a "3-in-1" port: JTAG + UART + USB OTG, via an onboard FT2232
   (Digilent JTAG-SMT1) and a USB hub.
 
+## Maia SDR firmware (`pzsdr_p201pro`)
+
+Maia SDR runs on the PZSDR P201Pro via the maintained fork at
+[GlassOnTin/plutosdr-fw](https://github.com/GlassOnTin/plutosdr-fw) (HDL in
+[GlassOnTin/maia-sdr](https://github.com/GlassOnTin/maia-sdr)):
+
+- Prebuilt DFU images (`pzsdr_p201pro.dfu` + `uboot-env.dfu`) and flashing guide:
+  [GlassOnTin/plutosdr-fw releases](https://github.com/GlassOnTin/plutosdr-fw/releases/latest)
+- Traced AD9361 CMOS/SPI pinout and Vivado constraints:
+  `bitstream-analysis/ad9361-spi-pinout.md` and
+  `bitstream-analysis/pzsdr-p201pro-system_constr.xdc`
+- Flash from U-Boot DFU (`run dfu_sf` on `/dev/ttyUSB1`, then `dfu-util -d 0456:b674`)
+  and cold power-cycle afterward. Do not write QSPI from Linux (`pluto.frm`,
+  `flashcp`, or `fw_setenv`), as the Linux `spi-nor` driver mis-addresses the
+  board's Winbond `W25Q256` flash.
+
 ## Getting started
 
 ### Serial console (no soldering)
