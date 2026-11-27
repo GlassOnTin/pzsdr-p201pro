@@ -327,3 +327,38 @@ mode1 like vendor), set compatible "adi,ad9361", remove the clock_extern_en MIO4
 hog. The bitstream SPI routing is correct; the ILOGIC IDDR-vs-ISERDES difference
 is not in the combinatorial PS7 MISO path (IBUF -> spi0_sdi_i -> SPI0_MISO_I).
 NOT yet re-tested with the corrected DTB.
+
+## FINAL RESOLUTION (2026-11-27): T10/T11 IOB_Y0/Y1 swap + full AD9361 pinout & Maia-SDR verified live
+
+### 1. Second root cause of `PRODUCT_ID 0xFF` on Maia: `T10`/`T11` (`spi_csn`/`spi_clk`) swap in `iob_pinmap.csv`
+
+Rebuilding and flashing the DTB-fixed Maia FIT (`spi-cpha` mode 1, `compatible = "adi,ad9361"`, no `clock_extern_en` hog, `usb0` `xlnx,phy-reset-gpio = <&gpio0 48 0>`) still read `PRODUCT_ID 0xFF` with the Nov-23 Maia bitstream, whereas hot-loading byte-swapped `stock.bit.bin` via `/sys/class/fpga_manager/fpga0/firmware` on the same running Maia Linux 6.1 kernel immediately initialized the AD9361 (`ad9361 spi0.0: AD936x Rev 0 successfully initialized`).
+
+Comparing `stock.fasm` against `pzsdr4.fasm` on `RIOB33_X73Y97` revealed `PULLTYPE.PULLUP` on `IOB_Y1` in `stock.fasm` vs `IOB_Y0` in `pzsdr4.fasm`. Checking `prjxray-db/zynq7/xc7z020clg400-2/package_pins.csv` + `tilegrid.json` showed that `iob_pinmap.csv` had sorted differential pin pairs alphabetically (`T10 T11`), inverting `IOB_Y0` (`IOB33M`) and `IOB_Y1` (`IOB33S`) on 11 tiles where the `M` ball sorts after the `S` ball:
+- `RIOB33_X73Y97`: `IOB_Y0` (`IOB_X1Y98`, `IOB33M`) = **`T11`** (`spi_clk`, 26 hops from `PS7_EMIOSPI0SCLKO`), `IOB_Y1` (`IOB_X1Y97`, `IOB33S`, `PULLUP`) = **`T10`** (`spi_csn`, 27 hops from `PS7_EMIOSPI0SSON0`).
+- `RIOB33_X73Y95`: `IOB_Y0` (`IOB_X1Y96`, `IOB33M`) = **`T12`** (`spi_mosi`), `IOB_Y1` (`IOB_X1Y95`, `IOB33S`) = **`U12`** (`spi_miso`).
+- `RIOB33_X73Y59`: `IOB_Y0` (`IOB33M`) = **`T17`**, `IOB_Y1` (`IOB33S`) = **`R18`**.
+
+### 2. Full AD9361 digital interface pinout recovered from `stock.fasm` (`trace_ad9361_data_pins.py`)
+
+Tracing `stock.fasm` across `LIOB33` (Bank 13, 1.8V) and `RIOB33` (Bank 34, 1.8V; Bank 35 `Y123..Y149` is 3.3V RGMII/MDIO Ethernet, including `B19=MDC`/`A20=MDIO`):
+- **RX clock & frame:** `rx_clk_in = N18`, `rx_frame_in = R16`.
+- **RX 12-bit data (`rx_data_in[0..11]`):** Traced forward 2-3 SLICE hops from `RIOI3` `ILOGIC` `Q1`/`Q2` to `axi_ad9361` `ad_dcfilter`/`ad_iqcor` `DSP48E1` (`DSP_R_X25Y45/DSP_1_A[23:12]` and `DSP_R_X59Y50/DSP_0_A[23:12]`, with MSB `[11]` sign-extended across `A23..A24`). Every differential pair carries consecutive `(2k = IOB_Y1/N, 2k+1 = IOB_Y0/P)` bits:
+  - `[0]=V18`, `[1]=V17` (`Y57`)
+  - `[2]=Y19`, `[3]=Y18` (`Y65`)
+  - `[4]=W20`, `[5]=V20` (`Y67`)
+  - `[6]=W16`, `[7]=V16` (`Y63`)
+  - `[8]=U20`, `[9]=T20` (`Y69`)
+  - `[10]=R18`, `[11]=T17` (`Y59`)
+- **ENSM & control:** `enable = N17` (`EMIO 15` -> 4 SLICE FF hops -> `RIOI3_X73Y53.OLOGIC0` ODDR `D1==D2`), `txnrx = P16` (`EMIO 16` -> 4 SLICE FF hops -> `RIOI3_X73Y51.OLOGIC1` ODDR `D1==D2`), `gpio_en_agc = P18` (`EMIO 12`), `gpio_resetb = W19` (`EMIO 13`), `clk_out = U13`.
+- **GPIO status & control (`LIOB33` Bank 13):** `gpio_status[0..7] = Y9, W10, Y8, V8, W8, W9, U10, T9` (`EMIO 0..7`); `gpio_ctl[0..3] = U7, Y6, Y7, V7` (`EMIO 8..11`).
+- **TX interface (Bank 34 ODDRs):** `tx_clk_out = U14` (1-signal upstream `dac_clksel` fan-in), `tx_frame_out = Y16` (2-signal control fan-in), and 12 `tx_data_out` pins `{W15, V15, U17, T16, Y14, W14, R14, P14, T15, T14, W13, V12}` (`V12` traces to `DSP_R_X59Y90/DSP_0_P30`; intra-pair TX bit permutation on the remaining pairs is unverified on RF because Maia-SDR disables TX DDS/DMA and sets `adi,digital-interface-tune-skip-mode = <1>`).
+
+### 3. Hardware verification on PZSDR P201Pro (Maia Linux 6.1, cold QSPI boot)
+
+Rebuilt `plutoplus_z7020` bitstream in Vivado 2025.2 with restored clock constraints (`WNS = +0.790 ns`, `WHS = +0.041 ns`), repacked `pzsdr_maia.itb` (`20,382,103` bytes, MD5 `2f2e037b708a1ccb495e7cc8da82ac6b`) and `maia_env.bin` (adding `uio_pdrv_genirq.of_id=uio_pdrv_genirq` to `bootargs`), flashed via U-Boot DFU (`0456:b674`), and cold power-cycled:
+1. `dmesg`: `ad9361 spi0.0: AD936x Rev 0 successfully initialized`, `cf_axi_dds 79024000.cf-ad9361-dds-core-lpc` probed, `cf_axi_adc 79020000.cf-ad9361-lpc` RX PRBS digital interface tuning passed (`reg 0x006 = 0x08`, matching vendor), `maia_sdr.ko` loaded, `/dev/uio0` bound (`GIC-0 89 maia-sdr` interrupts advancing).
+2. `http://192.168.2.1:8000/` and `/api` return HTTP 200; REST LO tuning verified (`100 MHz` FM band and `2.4 GHz` at `30.72` and `61.44 MSPS`); SigMF DMA IQ recording (`0.01 s` at `61.44 MSPS`) captured exact `2,457,600` bytes.
+3. Live WebSocket `ws://192.168.2.1:8000/waterfall` (4096-point FFT at `30.72 MSPS`):
+   - `BIST_INJ_RX` (`2 3 6 0`, `+fs/8 = +3.840 MHz`): peak at exact bin `2560` = `102.63 dB`, median noise floor `7.17 dB` (`+95.47 dB` SNR), image bin `1536` = `-2.83 dB` (`105.46 dB` image rejection).
+   - `BIST_INJ_RX` (`2 0 6 0`, `+fs/32 = +0.960 MHz`): peak at exact bin `2176` = `102.63 dB`, median noise floor `7.27 dB` (`+95.36 dB` SNR).
